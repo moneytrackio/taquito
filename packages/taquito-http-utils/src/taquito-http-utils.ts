@@ -43,14 +43,14 @@ export class HttpRequestFailed implements Error {
 }
 
 export class HttpBackend {
-  private serialize(obj?: { [key: string]: any }) {
+  serialize(obj?: { [key: string]: any }) {
     if (!obj) {
       return '';
     }
 
     const str = [];
     for (const p in obj) {
-      if (obj.hasOwnProperty(p) && obj[p]) {
+      if (obj.hasOwnProperty(p) && typeof obj[p] !== 'undefined') {
         const prop = typeof obj[p].toJSON === 'function' ? obj[p].toJSON() : obj[p];
         // query arguments can have no value so we need some way of handling that
         // example https://domain.com/query?all
