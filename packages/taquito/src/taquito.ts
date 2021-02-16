@@ -40,6 +40,7 @@ export { Extension } from './extension/extension';
 export * from './parser/interface';
 export * from './parser/michel-codec-parser';
 export * from './parser/noop-parser'
+import { DryRunProvider } from './contract/interface';
 
 export interface SetProviderOptions {
   forger?: Forger;
@@ -219,6 +220,13 @@ export class TezosToolkit {
    */
   get estimate(): EstimationProvider {
     return this._context.estimate;
+  }
+
+  /**
+   * @description Provide access to operation estimation utilities
+   */
+  get dryRun(): DryRunProvider {
+    return this._context.dryRun;
   }
 
   /**

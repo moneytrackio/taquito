@@ -12,6 +12,7 @@ import {
 } from '../operations/types';
 import { ContractAbstraction } from './contract';
 import { Estimate } from './estimate';
+import { PreapplyResponse } from '@taquito/rpc';
 
 export type ContractSchema = Schema | unknown;
 
@@ -56,6 +57,49 @@ export interface EstimationProvider {
    */
   registerDelegate(params?: RegisterDelegateParams): Promise<Estimate>;
   batch(params: ParamsWithKind[]): Promise<Estimate[]>;
+}
+
+export interface DryRunProvider {
+  /**
+   *
+   * @description Estimate gasLimit, storageLimit and fees for an origination operation
+   *
+   * @returns An estimation of gasLimit, storageLimit and fees for the operation
+   *
+   * @param Estimate
+   */
+  originate(params: OriginateParams): Promise<PreapplyResponse>;
+
+  /**
+   *
+   * @description Estimate gasLimit, storageLimit and fees for an transfer operation
+   *
+   * @returns An estimation of gasLimit, storageLimit and fees for the operation
+   *
+   * @param Estimate
+   */
+  transfer({ fee, storageLimit, gasLimit, ...rest }: TransferParams): Promise<PreapplyResponse>;
+
+  /**
+   *
+   * @description Estimate gasLimit, storageLimit and fees for a delegate operation
+   *
+   * @returns An estimation of gasLimit, storageLimit and fees for the operation
+   *
+   * @param Estimate
+   */
+  setDelegate(params: DelegateParams): Promise<PreapplyResponse>;
+
+  /**
+   *
+   * @description Estimate gasLimit, storageLimit and fees for a delegate operation
+   *
+   * @returns An estimation of gasLimit, storageLimit and fees for the operation
+   *
+   * @param Estimate
+   */
+  registerDelegate(params?: RegisterDelegateParams): Promise<PreapplyResponse>;
+  batch(params: ParamsWithKind[]): Promise<PreapplyResponse>;
 }
 
 export interface StorageProvider {
