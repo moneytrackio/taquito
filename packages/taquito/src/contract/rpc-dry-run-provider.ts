@@ -25,6 +25,9 @@ import {
   createTransferOperation,
 } from './prepare';
 import { Protocols } from '../constants'
+import { TransactionOperation } from '../operations/transaction-operation';
+import { RPCTransferOperation } from '../operations/types';
+
 
 interface Limits {
   fee?: number;
@@ -76,9 +79,8 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
 
   private async createEstimate(params: PrepareOperationParams) {
     const {
-      opbytes,
       opOb: { branch, contents },
-    } = await this.prepareAndForge(params);
+    } = await this.prepareAndForge(params);;
 
     let operation: RPCRunOperationParam = {
       operation: { branch, contents, signature: SIGNATURE_STUB },
@@ -129,6 +131,7 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
+    
     return (await this.createEstimate({ operation: op, source: pkh }));
   }
 
