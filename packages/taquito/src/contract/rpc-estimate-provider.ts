@@ -158,7 +158,8 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     }));
-    return (await this.createEstimate({ operation: op, source: pkh }))[0];
+    const transactions = await this.createEstimate({ operation: op, source: pkh });
+    return transactions[0];
   }
   /**
    *
@@ -175,7 +176,8 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
-    return (await this.createEstimate({ operation: op, source: pkh }))[0];
+    const transactions = await this.createEstimate({ operation: op, source: pkh });
+    return transactions[0];
   }
 
   /**
@@ -193,7 +195,9 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
-    return (await this.createEstimate({ operation: op, source: sourceOrDefault }))[0];
+
+    const transactions = await this.createEstimate({ operation: op, source: sourceOrDefault });
+    return transactions[0];
   }
 
   async batch(params: ParamsWithKind[]) {
@@ -235,7 +239,9 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
           throw new Error(`Unsupported operation kind: ${(param as any).kind}`);
       }
     }
-    return this.createEstimate({ operation: operations });
+
+    const transactions = await this.createEstimate({ operation: operations });
+    return transactions;
   }
 
   /**

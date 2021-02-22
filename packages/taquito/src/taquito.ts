@@ -2,7 +2,7 @@ import { RpcClient } from '@taquito/rpc';
 import { RPCBatchProvider } from './batch/rpc-batch-provider';
 import { Protocols } from './constants';
 import { Config, Context, TaquitoProvider } from './context';
-import { ContractProvider, EstimationProvider } from './contract/interface';
+import { ContractProvider, EstimationProvider, DryRunProvider } from './contract/interface';
 import { Extension } from './extension/extension';
 import { Forger } from './forger/interface';
 import { RpcForger } from './forger/rpc-forger';
@@ -39,8 +39,7 @@ export * from './wallet';
 export { Extension } from './extension/extension';
 export * from './parser/interface';
 export * from './parser/michel-codec-parser';
-export * from './parser/noop-parser'
-import { DryRunProvider } from './contract/interface';
+export * from './parser/noop-parser';
 
 export interface SetProviderOptions {
   forger?: Forger;

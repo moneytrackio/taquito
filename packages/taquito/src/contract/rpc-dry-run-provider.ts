@@ -16,7 +16,6 @@ import {
   RPCOperation,
   TransferParams,
 } from '../operations/types';
-import { Estimate } from './estimate';
 import { DryRunProvider } from './interface';
 import {
   createOriginationOperation,
@@ -24,10 +23,6 @@ import {
   createSetDelegateOperation,
   createTransferOperation,
 } from './prepare';
-import { Protocols } from '../constants'
-import { TransactionOperation } from '../operations/transaction-operation';
-import { RPCTransferOperation } from '../operations/types';
-
 
 interface Limits {
   fee?: number;
@@ -80,7 +75,7 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
   private async createEstimate(params: PrepareOperationParams) {
     const {
       opOb: { branch, contents },
-    } = await this.prepareAndForge(params);;
+    } = await this.prepareAndForge(params);
 
     let operation: RPCRunOperationParam = {
       operation: { branch, contents, signature: SIGNATURE_STUB },
@@ -114,7 +109,8 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     }));
-    return (await this.createEstimate({ operation: op, source: pkh }));
+    const transaction = await this.createEstimate({ operation: op, source: pkh })
+    return transaction;
   }
   /**
    *
@@ -132,7 +128,8 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
     
-    return (await this.createEstimate({ operation: op, source: pkh }));
+    const transaction = await this.createEstimate({ operation: op, source: pkh })
+    return transaction;
   }
 
   /**
@@ -150,7 +147,8 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
-    return (await this.createEstimate({ operation: op, source: sourceOrDefault }));
+    const transaction = await this.createEstimate({ operation: op, source: sourceOrDefault })
+    return transaction;
   }
 
   async batch(params: ParamsWithKind[]) {
@@ -192,7 +190,9 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
           throw new Error(`Unsupported operation kind: ${(param as any).kind}`);
       }
     }
-    return this.createEstimate({ operation: operations });
+
+    const transaction = await this.createEstimate({ operation: operations })
+    return transaction;
   }
 
   /**
@@ -209,8 +209,7 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       { ...params, ...DEFAULT_PARAMS },
       await this.signer.publicKeyHash()
     );
-    return (
-      await this.createEstimate({ operation: op, source: await this.signer.publicKeyHash() })
-    );
+    const trasactions = await this.createEstimate({ operation: op, source: await this.signer.publicKeyHash() })
+    return trasactions;
   }
 }
