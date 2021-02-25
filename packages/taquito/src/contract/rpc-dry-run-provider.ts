@@ -1,17 +1,8 @@
-import { PreapplyResponse, RPCRunOperationParam, OpKind } from '@taquito/rpc';
-import BigNumber from 'bignumber.js';
-import { OperationEmitter } from '../operations/operation-emitter';
-import {
-  flattenErrors,
-  flattenOperationResult,
-  TezosOperationError,
-} from '../operations/operation-errors';
+import { OpKind } from '@taquito/rpc';
 import {
   DelegateParams,
-  isOpWithFee,
   OriginateParams,
   ParamsWithKind,
-  PrepareOperationParams,
   RegisterDelegateParams,
   RPCOperation,
   TransferParams,
@@ -23,76 +14,9 @@ import {
   createSetDelegateOperation,
   createTransferOperation,
 } from './prepare';
+import { PreaplyEmitter, mergeLimits } from '../operations/preaply-emitter';
 
-interface Limits {
-  fee?: number;
-  storageLimit?: number;
-  gasLimit?: number;
-}
-
-const mergeLimits = (
-  userDefinedLimit: Limits,
-  defaultLimits: Required<Limits>
-): Required<Limits> => {
-  return {
-    fee: typeof userDefinedLimit.fee === 'undefined' ? defaultLimits.fee : userDefinedLimit.fee,
-    gasLimit:
-      typeof userDefinedLimit.gasLimit === 'undefined'
-        ? defaultLimits.gasLimit
-        : userDefinedLimit.gasLimit,
-    storageLimit:
-      typeof userDefinedLimit.storageLimit === 'undefined'
-        ? defaultLimits.storageLimit
-        : userDefinedLimit.storageLimit,
-  };
-};
-
-// RPC requires a signature but does not verify it
-const SIGNATURE_STUB =
-  'edsigtkpiSSschcaCt9pUVrpNPf7TTcgvgDEDD6NCEHMy8NNQJCGnMfLZzYoQj74yLjo9wx6MPVV29CvVzgi7qEcEUok3k7AuMg';
-
-export class RPCDryRunProvider extends OperationEmitter implements DryRunProvider {
-  private readonly ALLOCATION_STORAGE = 257;
-  private readonly ORIGINATION_STORAGE = 257;
-
-  // Maximum values defined by the protocol
-  private async getAccountLimits(pkh: string) {
-    const balance = await this.rpc.getBalance(pkh);
-    const {
-      hard_gas_limit_per_operation,
-      hard_storage_limit_per_operation,
-      cost_per_byte,
-    } = await this.rpc.getConstants();
-    return {
-      fee: 0,
-      gasLimit: hard_gas_limit_per_operation.toNumber(),
-      storageLimit: Math.floor(
-        BigNumber.min(balance.dividedBy(cost_per_byte), hard_storage_limit_per_operation).toNumber()
-      ),
-    };
-  }
-
-  private async createEstimate(params: PrepareOperationParams) {
-    const {
-      opOb: { branch, contents },
-    } = await this.prepareAndForge(params);
-
-    let operation: RPCRunOperationParam = {
-      operation: { branch, contents, signature: SIGNATURE_STUB },
-      chain_id: await this.rpc.getChainId(),
-    };
-
-    const { opResponse } = await this.simulate(operation);
-    const errors = [...flattenErrors(opResponse, 'backtracked'), ...flattenErrors(opResponse)];
-
-    // Fail early in case of errors
-    if (errors.length) {
-      throw new TezosOperationError(errors);
-    }
-
-    return opResponse
-  }
-
+export class RPCDryRunProvider extends PreaplyEmitter implements DryRunProvider {
   /**
    *
    * @description Estimate gasLimit, storageLimit and fees for an origination operation
@@ -106,10 +30,11 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
     const DEFAULT_PARAMS = await this.getAccountLimits(pkh);
     const op = await createOriginationOperation(
       await this.context.parser.prepareCodeOrigination({
-      ...rest,
-      ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
-    }));
-    const transaction = await this.createEstimate({ operation: op, source: pkh })
+        ...rest,
+        ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
+      })
+    );
+    const transaction = await this.makeOperation({ operation: op, source: pkh });
     return transaction;
   }
   /**
@@ -127,8 +52,8 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
-    
-    const transaction = await this.createEstimate({ operation: op, source: pkh })
+
+    const transaction = await this.makeOperation({ operation: op, source: pkh });
     return transaction;
   }
 
@@ -147,7 +72,7 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       ...rest,
       ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
     });
-    const transaction = await this.createEstimate({ operation: op, source: sourceOrDefault })
+    const transaction = await this.makeOperation({ operation: op, source: sourceOrDefault });
     return transaction;
   }
 
@@ -191,7 +116,7 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       }
     }
 
-    const transaction = await this.createEstimate({ operation: operations })
+    const transaction = await this.makeOperation({ operation: operations });
     return transaction;
   }
 
@@ -209,7 +134,10 @@ export class RPCDryRunProvider extends OperationEmitter implements DryRunProvide
       { ...params, ...DEFAULT_PARAMS },
       await this.signer.publicKeyHash()
     );
-    const trasactions = await this.createEstimate({ operation: op, source: await this.signer.publicKeyHash() })
+    const trasactions = await this.makeOperation({
+      operation: op,
+      source: await this.signer.publicKeyHash(),
+    });
     return trasactions;
   }
 }

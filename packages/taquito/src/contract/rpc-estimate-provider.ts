@@ -1,11 +1,6 @@
 import { PreapplyResponse, RPCRunOperationParam, OpKind } from '@taquito/rpc';
 import BigNumber from 'bignumber.js';
-import { OperationEmitter } from '../operations/operation-emitter';
-import {
-  flattenErrors,
-  flattenOperationResult,
-  TezosOperationError,
-} from '../operations/operation-errors';
+import { flattenOperationResult } from '../operations/operation-errors';
 import {
   DelegateParams,
   isOpWithFee,
@@ -24,56 +19,9 @@ import {
   createSetDelegateOperation,
   createTransferOperation,
 } from './prepare';
-import { Protocols } from '../constants'
+import { PreaplyEmitter, mergeLimits, SIGNATURE_STUB } from '../operations/preaply-emitter';
 
-interface Limits {
-  fee?: number;
-  storageLimit?: number;
-  gasLimit?: number;
-}
-
-const mergeLimits = (
-  userDefinedLimit: Limits,
-  defaultLimits: Required<Limits>
-): Required<Limits> => {
-  return {
-    fee: typeof userDefinedLimit.fee === 'undefined' ? defaultLimits.fee : userDefinedLimit.fee,
-    gasLimit:
-      typeof userDefinedLimit.gasLimit === 'undefined'
-        ? defaultLimits.gasLimit
-        : userDefinedLimit.gasLimit,
-    storageLimit:
-      typeof userDefinedLimit.storageLimit === 'undefined'
-        ? defaultLimits.storageLimit
-        : userDefinedLimit.storageLimit,
-  };
-};
-
-// RPC requires a signature but does not verify it
-const SIGNATURE_STUB =
-  'edsigtkpiSSschcaCt9pUVrpNPf7TTcgvgDEDD6NCEHMy8NNQJCGnMfLZzYoQj74yLjo9wx6MPVV29CvVzgi7qEcEUok3k7AuMg';
-
-export class RPCEstimateProvider extends OperationEmitter implements EstimationProvider {
-  private readonly ALLOCATION_STORAGE = 257;
-  private readonly ORIGINATION_STORAGE = 257;
-
-  // Maximum values defined by the protocol
-  private async getAccountLimits(pkh: string) {
-    const balance = await this.rpc.getBalance(pkh);
-    const {
-      hard_gas_limit_per_operation,
-      hard_storage_limit_per_operation,
-      cost_per_byte,
-    } = await this.rpc.getConstants();
-    return {
-      fee: 0,
-      gasLimit: hard_gas_limit_per_operation.toNumber(),
-      storageLimit: Math.floor(
-        BigNumber.min(balance.dividedBy(cost_per_byte), hard_storage_limit_per_operation).toNumber()
-      ),
-    };
-  }
-
+export class RPCEstimateProvider extends PreaplyEmitter implements EstimationProvider {
   private createEstimateFromOperationContent(
     content: PreapplyResponse['contents'][0],
     size: number,
@@ -83,7 +31,7 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
     let totalGas = 0;
     let totalMilligas = 0;
     let totalStorage = 0;
-    operationResults.forEach(result => {
+    operationResults.forEach((result) => {
       totalStorage +=
         'originated_contracts' in result && typeof result.originated_contracts !== 'undefined'
           ? result.originated_contracts.length * this.ORIGINATION_STORAGE
@@ -101,7 +49,12 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
     }
 
     if (isOpWithFee(content)) {
-      return new Estimate(totalMilligas || 0, Number(totalStorage || 0), size, costPerByte.toNumber());
+      return new Estimate(
+        totalMilligas || 0,
+        Number(totalStorage || 0),
+        size,
+        costPerByte.toNumber()
+      );
     } else {
       return new Estimate(0, 0, size, costPerByte.toNumber(), 0);
     }
@@ -113,30 +66,23 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
       opOb: { branch, contents },
     } = await this.prepareAndForge(params);
 
-    let operation: RPCRunOperationParam = {
-      operation: { branch, contents, signature: SIGNATURE_STUB },
-      chain_id: await this.rpc.getChainId(),
-    };
+    let operation = await this.createOperationParams(branch, contents);
 
-    const { opResponse } = await this.simulate(operation);
+    const transactions = await this.preaplyOperation(operation);
+
     const { cost_per_byte } = await this.rpc.getConstants();
-    const errors = [...flattenErrors(opResponse, 'backtracked'), ...flattenErrors(opResponse)];
-
-    // Fail early in case of errors
-    if (errors.length) {
-      throw new TezosOperationError(errors);
-    }
 
     while (
-      opResponse.contents.length !== (Array.isArray(params.operation) ? params.operation.length : 1)
+      transactions.contents.length !==
+      (Array.isArray(params.operation) ? params.operation.length : 1)
     ) {
-      opResponse.contents.shift();
+      transactions.contents.shift();
     }
 
-    return opResponse.contents.map(x => {
+    return transactions.contents.map((x) => {
       return this.createEstimateFromOperationContent(
         x,
-        opbytes.length / 2 / opResponse.contents.length,
+        opbytes.length / 2 / transactions.contents.length,
         cost_per_byte
       );
     });
@@ -155,9 +101,10 @@ export class RPCEstimateProvider extends OperationEmitter implements EstimationP
     const DEFAULT_PARAMS = await this.getAccountLimits(pkh);
     const op = await createOriginationOperation(
       await this.context.parser.prepareCodeOrigination({
-      ...rest,
-      ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
-    }));
+        ...rest,
+        ...mergeLimits({ fee, storageLimit, gasLimit }, DEFAULT_PARAMS),
+      })
+    );
     const transactions = await this.createEstimate({ operation: op, source: pkh });
     return transactions[0];
   }
