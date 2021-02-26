@@ -8,7 +8,7 @@ export enum DEFAULT_FEE {
   DELEGATION = 1257,
   ORIGINATION = 10000,
   TRANSFER = 10000,
-  REVEAL = Number(process.env['DEFAULT_FEE_REVEAL'] || '1420'),
+  REVEAL = 0, // Number(process.env['DEFAULT_FEE_REVEAL'] || '1420'),
 }
 export enum DEFAULT_STORAGE_LIMIT {
   DELEGATION = 0,
